@@ -14,13 +14,10 @@ const messageSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.String,
         required: true,
     },
-    sender_id: {
-        type: mongoose.Schema.Types.String,
-        required: true,
-    },
     receiver_id: {
-        type: mongoose.Schema.Types.String,
+        type: mongoose.Schema.Types.ObjectId,
         required: true,
+        ref: messageSchema,
     },
     message: {
         type: mongoose.Schema.Types.Text,
