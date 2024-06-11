@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import cors from 'cors';
 import express from "express";
 import fs from 'fs';
@@ -5,7 +6,6 @@ import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { createServer } from 'node:http';
 import path from 'path';
-import sharp from 'sharp';
 import { Server } from "socket.io";
 import ConnectDB from "./config/connectDB";
 import Avatar from './models/avatar';
@@ -46,7 +46,7 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
     cors: {
-        origin: "http://localhost:5173",
+        origin: process.env.FE,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     },
 });
