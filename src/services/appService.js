@@ -1,69 +1,75 @@
-import ChatBoxService from "./ChatBoxService";
+import ConnectedUser from "../models/connectedUser"
+import User from "../models/user"
+import jwt from 'jsonwebtoken'
 
-const IoServiceChat = (io) => {
-    const rooms = {}; // Lưu trữ thông tin về các phòng và các client trong phòng
+export const IoServiceChat = (io) => {
+    io.use(function (socket, next) {
+        if (socket.handshake.query && socket.handshake.query.token) {
+            jwt.verify(socket.handshake.query.token, 'nodemy', function (err, decoded) {
+                if (err) return next(new Error('Authentication error'));
+                socket.user = decoded;
+                next();
+            });
+        }
+        else {
+            next(new Error('Authentication error'));
+        }
+    })
+    io.on("connection", async (socket) => {
+        let existUser = await User.findOne({ email: socket.user.email })
+        let connectedUser = await ConnectedUser.findOne({ user: existUser._id });
+        if (connectedUser == null) {
+            await ConnectedUser.create({ user: existUser._id })
+        }
 
-    io.on("connection", (socket) => {
-        socket.on("joinRoom", (phoneNumber) => {
-            socket.join(phoneNumber); // Tham gia vào phòng (room) tương ứng với số điện thoại
-
-            // Tạo phòng nếu chưa tồn tại
-            if (!rooms[phoneNumber]) {
-                rooms[phoneNumber] = new Set();
-            }
-
-            // Thêm client vào phòng
-            rooms[phoneNumber].add(socket);
-        });
-
-        const sendNewChat = async () => {
-            const dataRoom = await ChatBoxService.GetAllRoomChat();
-            if (dataRoom.errCode === 0) {
-                const dataFilter = dataRoom.data.filter(
-                    (item) => item.isNew === true
-                );
-                if (dataFilter.length > 0) {
-                    socket.emit("new room", dataFilter);
-                }
-            }
-        };
-
-        socket.on("chat bot", async (data) => {
-            try {
-                const dataChat = await ChatBoxService.GetAllGroup(
-                    data.idAccount
-                );
-
-                sendNewChat();
-
-                const phoneNumber = data.phoneNumber;
-
-                // Gửi tin nhắn đến tất cả client trong phòng (room) tương ứng với số điện thoại
-                if (rooms[phoneNumber]) {
-                    rooms[phoneNumber].forEach((client) => {
-                        client.emit("chat bot", dataChat);
-                    });
-                }
-            } catch (error) {
-                console.log(error);
-                socket.emit("chat bot", error);
+        let userList = await ConnectedUser.find().populate({
+            path: 'user',
+            populate: {
+                path: 'avatarId'
             }
         });
 
-        socket.on("disconnect", () => {
-            // Xóa client khỏi các phòng (rooms) mà nó tham gia
-            Object.keys(rooms).forEach((phoneNumber) => {
-                if (rooms[phoneNumber].has(socket)) {
-                    rooms[phoneNumber].delete(socket);
-                }
+        socket.join('public');
+        socket.emit('getUserList', userList)
+        socket.broadcast.to('public').emit('getUserList', userList)
 
-                // Xóa phòng nếu không còn client nào trong phòng
-                if (rooms[phoneNumber].size === 0) {
-                    delete rooms[phoneNumber];
+        socket.on('sendMessagePublic', (data) => {
+            if (data.content != undefined) {
+                socket.broadcast.to('public').emit('receiveMessagePublic', {
+                    id: data.id,
+                    content: data.content,
+                    name: socket.user.name
+                });
+            } else socket.broadcast.to('public').emit('receiveMessagePublic', {
+                id: data.id,
+                imageId: {
+                    path: data.path
+                },
+                name: socket.user.name
+            });
+        });
+
+        socket.on('refreshUser', async () => {
+            userList = await ConnectedUser.find().populate({
+                path: 'user',
+                populate: {
+                    path: 'avatarId'
                 }
             });
+            socket.emit('receiveUser', userList);
+            socket.broadcast.to('public').emit('receiveUser', userList);
+        })
+
+        socket.on("disconnect", async () => {
+            let onlUser = await User.findOne({ email: socket.user.email })
+            await ConnectedUser.findOneAndDelete({ user: onlUser._id })
+            userList = await ConnectedUser.find().populate({
+                path: 'user',
+                populate: {
+                    path: 'avatarId'
+                }
+            });
+            await socket.broadcast.to('public').emit('getUserList', userList)
         });
     });
 };
-
-export default { IoServiceChat };
