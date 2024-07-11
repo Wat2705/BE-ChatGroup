@@ -1,9 +1,9 @@
-import 'dotenv/config'
 import cors from 'cors';
+import 'dotenv/config';
 import express from "express";
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
-import multer from 'multer';
+import multer from 'multer'
 import { createServer } from 'node:http';
 import path from 'path';
 import { Server } from "socket.io";
@@ -21,17 +21,16 @@ const storage = (dir) => {
         destination: function (req, file, cb) {
             cb(null, `./uploads/${dir}`)
         },
-        filename: function (req, file, cb) {
-            fs.readdir(`./uploads/${dir}`, (err, files) => {
-                files.forEach(fsFile => {
-                    if (dir == 'avatar') {
-                        if (fsFile.split('.')[0] == req.user.id) {
-                            fs.unlink(`./uploads/${dir}/${fsFile}`, (err) => { })
-                        }
-                    }
-                });
-            });
+        filename: async function (req, file, cb) {
             if (dir == 'avatar') {
+                let files = await fs.promises.readdir(`./uploads/${dir}`)
+                for (const fsFile of files) {
+                    if (fsFile.split('.')[0] == req.user.id) {
+                        fs.rmSync(`./uploads/${dir}/${fsFile}`, {
+                            force: true
+                        })
+                    }
+                }
                 cb(null, `${req.user.id}.${file.originalname.split('.')[1]}`)
             } else cb(null, file.originalname)
         }
@@ -71,11 +70,9 @@ app.post('/upload', upload.single('image'), async (req, res) => {
                 path: req.file.path
             }
         )
-
-        existImage = data
+        existImage = data;
     }
-
-    res.status(200).json(existImage)
+    res.status(200).json(existImage);
 })
 
 app.post('/avatar', async (req, res, next) => {
@@ -86,16 +83,26 @@ app.post('/avatar', async (req, res, next) => {
 }, avatar.single('avatar'), async (req, res) => {
     if (req.file == undefined) {
         await user.findByIdAndUpdate(req.user.id, { name: req.body.name })
+        res.status(200).json({ message: 'ok' })
     } else {
-        let data = await Avatar.create({
-            name: req.file.filename,
-            path: req.file.path
-        })
+        let data = await Avatar.findOne({ name: req.file.filename.split('.')[0] });
+        if (data == undefined) {
+            data = await Avatar.create({
+                name: req.file.filename.split('.')[0],
+                path: req.file.path
+            })
+        } else {
+            await Avatar.findByIdAndDelete(data._id)
+            data = await Avatar.create({
+                name: req.file.filename.split('.')[0],
+                path: req.file.path
+            })
+        }
         if (req.body.name != undefined) {
             await user.findByIdAndUpdate(req.user.id, { avatarId: data._id, name: req.body.name })
         } else await user.findByIdAndUpdate(req.user.id, { avatarId: data._id })
+        res.status(200).json({ path: req.file.path })
     }
-    res.status(200).json({ message: 'ok' })
 })
 
 ConnectDB();

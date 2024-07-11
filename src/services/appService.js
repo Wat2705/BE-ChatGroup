@@ -49,13 +49,19 @@ export const IoServiceChat = (io) => {
             });
         });
 
-        socket.on('refreshUser', async () => {
+        socket.on('refreshUser', async (data) => {
             userList = await ConnectedUser.find().populate({
                 path: 'user',
                 populate: {
                     path: 'avatarId'
                 }
             });
+            userList = userList.filter(e => {
+                if (e.user.id == data.id) {
+                    e.user.avatarId.path = data.path
+                }
+                return true
+            })
             socket.emit('receiveUser', userList);
             socket.broadcast.to('public').emit('receiveUser', userList);
         })
