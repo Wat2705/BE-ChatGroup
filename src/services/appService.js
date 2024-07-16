@@ -30,8 +30,8 @@ export const IoServiceChat = (io) => {
         });
 
         socket.join('public');
-        socket.emit('getUserList', userList)
-        socket.broadcast.to('public').emit('getUserList', userList)
+        socket.emit('getUserList', { userList, length: userList.length })
+        socket.broadcast.to('public').emit('getUserList', { userList, length: userList.length })
 
         socket.on('sendMessagePublic', (data) => {
             if (data.content != undefined) {
@@ -56,12 +56,16 @@ export const IoServiceChat = (io) => {
                     path: 'avatarId'
                 }
             });
-            userList = userList.filter(e => {
-                if (e.user.id == data.id) {
-                    e.user.avatarId.path = data.path
-                }
-                return true
-            })
+
+            if (data.path != '') {
+                userList = userList.filter(e => {
+                    if (e.user.id == data.id && e.user.avatarId != null) {
+                        e.user.avatarId.path = data.path
+                    }
+                    return true
+                })
+            }
+
             socket.emit('receiveUser', userList);
             socket.broadcast.to('public').emit('receiveUser', userList);
         })
@@ -75,7 +79,7 @@ export const IoServiceChat = (io) => {
                     path: 'avatarId'
                 }
             });
-            await socket.broadcast.to('public').emit('getUserList', userList)
+            await socket.broadcast.to('public').emit('getUserList', { userList, length: userList.length })
         });
     });
 };

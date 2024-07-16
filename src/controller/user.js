@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
-import User from "../models/user"
-import ConnectedUser from "../models/connectedUser"
+import User from "../models/user";
+import ConnectedUser from "../models/connectedUser";
+import Token from '../models/token';
 
 export const register = async (req, res) => {
     const existUser = await User.findOne({ email: req.body.email });
@@ -24,4 +25,16 @@ export const logIn = async (req, res) => {
             })
         } else res.status(400).json({ message: 'Tài khoản của bạn đã được đăng nhập ở 1 nơi khác!' })
     } else res.status(400).json({ message: 'Sai email hoặc mật khẩu!' })
+}
+
+export const logOut = async (req, res) => {
+    if (await Token.findOne({ value: req.body.token }) == null) {
+        await Token.create({ value: req.body.token })
+    }
+    res.status(200).json({ message: 'ok' })
+}
+
+export const changeName = async (req, res) => {
+    await User.findByIdAndUpdate(req.user.id, { name: req.body.name })
+    res.status(200).json({ message: 'ok' })
 }

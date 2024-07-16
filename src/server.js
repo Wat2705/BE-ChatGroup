@@ -22,6 +22,11 @@ const storage = (dir) => {
             cb(null, `./uploads/${dir}`)
         },
         filename: async function (req, file, cb) {
+            if ((await fs.promises.readdir('.')).find(e => e == 'uploads') == undefined) {
+                await fs.promises.mkdir('./uploads/avatar', { recursive: true })
+                await fs.promises.mkdir('./uploads/image', { recursive: true })
+            }
+
             if (dir == 'avatar') {
                 let files = await fs.promises.readdir(`./uploads/${dir}`)
                 for (const fsFile of files) {
@@ -31,6 +36,7 @@ const storage = (dir) => {
                         })
                     }
                 }
+
                 cb(null, `${req.user.id}.${file.originalname.split('.')[1]}`)
             } else cb(null, file.originalname)
         }
@@ -81,10 +87,7 @@ app.post('/avatar', async (req, res, next) => {
         next()
     } else res.status(400).json({ message: 'Token required' })
 }, avatar.single('avatar'), async (req, res) => {
-    if (req.file == undefined) {
-        await user.findByIdAndUpdate(req.user.id, { name: req.body.name })
-        res.status(200).json({ message: 'ok' })
-    } else {
+    if (req.file != undefined) {
         let data = await Avatar.findOne({ name: req.file.filename.split('.')[0] });
         if (data == undefined) {
             data = await Avatar.create({
@@ -98,10 +101,11 @@ app.post('/avatar', async (req, res, next) => {
                 path: req.file.path
             })
         }
-        if (req.body.name != undefined) {
-            await user.findByIdAndUpdate(req.user.id, { avatarId: data._id, name: req.body.name })
-        } else await user.findByIdAndUpdate(req.user.id, { avatarId: data._id })
+        await user.findByIdAndUpdate(req.user.id, { avatarId: data._id })
         res.status(200).json({ path: req.file.path })
+    } else {
+        await user.findByIdAndUpdate(req.user.id, { avatarId: null })
+        res.status(200).json({ message: 'ok' })
     }
 })
 
