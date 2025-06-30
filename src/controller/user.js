@@ -28,11 +28,28 @@ export const logIn = async (req, res) => {
 }
 
 export const logOut = async (req, res) => {
-    if (await Token.findOne({ value: req.body.token }) == null) {
-        await Token.create({ value: req.body.token })
+  const token = req.body.token;
+  if (!token) {
+    return res.status(400).json({ message: 'Token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, 'nodemy');
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
     }
-    res.status(200).json({ message: 'ok' })
-}
+
+    await ConnectedUser.findOneAndDelete({ user: user._id });
+
+    await Token.create({ value: token });
+
+    res.status(200).json({ message: 'Đăng xuất thành công' });
+  } catch (err) {
+    console.error('Logout error:', err.message);
+    res.status(401).json({ message: 'Invalid token' });
+  }
+};
 
 export const changeName = async (req, res) => {
     await User.findByIdAndUpdate(req.user.id, { name: req.body.name })
