@@ -52,7 +52,7 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
         origin: (origin, callback) => {
-            const allowedOrigins = ['http://localhost:5173', 'http://localhost:5173/'];
+            const allowedOrigins = ['http://localhost:5173', 'http://localhost:5173/', 'https://be-chatgroup.onrender.com'];
             if (!origin || allowedOrigins.includes(origin)) {
                 callback(null, true);
             } else {
