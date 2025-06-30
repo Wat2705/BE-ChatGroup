@@ -1,6 +1,6 @@
+import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import express from 'express';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
@@ -20,27 +20,27 @@ const storage = (dir) => {
     return multer.diskStorage({
         destination: function (req, file, cb) {
             cb(null, `./uploads/${dir}`);
-},
-    filename: async function (req, file, cb) {
-        if ((await fs.promises.readdir('.')).find(e => e === 'uploads') === undefined) {
-            await fs.promises.mkdir('./uploads/avatar', { recursive: true });
-            await fs.promises.mkdir('./uploads/image', { recursive: true });
-        }
-
-        if (dir === 'avatar') {
-            let files = await fs.promises.readdir(`./uploads/${dir}`);
-            for (const fsFile of files) {
-                if (fsFile.split('.')[0] === req.user.id) {
-                    fs.rmSync(`./uploads/${dir}/${fsFile}`, { force: true });
-                }
+        },
+        filename: async function (req, file, cb) {
+            if ((await fs.promises.readdir('.')).find(e => e === 'uploads') === undefined) {
+                await fs.promises.mkdir('./uploads/avatar', { recursive: true });
+                await fs.promises.mkdir('./uploads/image', { recursive: true });
             }
 
-            cb(null, `${req.user.id}.${file.originalname.split('.')[1]}`);
-        } else {
-            cb(null, file.originalname);
-        }
-    },
-});
+            if (dir === 'avatar') {
+                let files = await fs.promises.readdir(`./uploads/${dir}`);
+                for (const fsFile of files) {
+                    if (fsFile.split('.')[0] === req.user.id) {
+                        fs.rmSync(`./uploads/${dir}/${fsFile}`, { force: true });
+                    }
+                }
+
+                cb(null, `${req.user.id}.${file.originalname.split('.')[1]}`);
+            } else {
+                cb(null, file.originalname);
+            }
+        },
+    });
 };
 
 const upload = multer({ storage: storage('image') });
@@ -52,9 +52,16 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
         origin: (origin, callback) => {
-            const allowedOrigins = ['http://localhost:5173', 'http://localhost:5173/', 'https://fe-chat-group.vercel.app'];
-            if (!origin || allowedOrigins.includes(origin)) {
-                callback(null, true);
+            const fe = process.env.FE;
+            if (!fe) {
+                console.error('FE environment variable is not defined');
+                callback(new Error('CORS configuration error: FE not set'));
+                return;
+            }
+            const base = fe.endsWith('/') ? fe.slice(0, -1) : fe;
+            const allowedOrigins = [fe, `${base}/`];
+            if (!origin || allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+                callback(null, fe);
             } else {
                 callback(new Error('Not allowed by CORS'));
             }
